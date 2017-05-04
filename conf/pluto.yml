@@ -1,0 +1,37 @@
+server:
+  requestLog:
+    timeZone: Asia/Shanghai
+    appenders:
+      - type: file
+        currentLogFilename: ./logs/access.log
+        archivedLogFilenamePattern: ./logs/access-%d.log.gz
+        archivedFileCount: 5
+  applicationConnectors:
+      - type: http
+        port: 8080
+  adminConnectors:
+      - type: http
+        port: 8081
+
+logging:
+  level: DEBUG
+  appenders:
+    - type: file
+      currentLogFilename: ./logs/pluto.log
+      archivedLogFilenamePattern: ./logs/pluto-%d.log.gz
+      archivedFileCount: 5
+      timeZone: Asia/Shanghai
+
+pluto:
+  jobQueueSize: 20
+  workerNum: 10
+
+plutoDb:
+  driverClass: com.mysql.jdbc.Driver
+  url: jdbc:mysql://db.pluto.rds.sogou/pluto?user=clouddev&password=clouddev123456&useUnicode=true&characterEncoding=utf8&autoReconnect=true
+  initConnectionNum: 3
+  minConnectionNum: 3
+  maxConnectionNum: 50
+  idleTimeout: 30000
+  idleQueueSize: 50
+  idleConnectionCloseThreadPoolSize: 10
