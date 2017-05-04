@@ -8,6 +8,7 @@ import com.sogou.pluto.model.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -44,16 +45,23 @@ public class JobExecuteController implements Runnable {
 
   private class Worker implements Runnable {
     private void runJob(Job job) {
-      // TODO execute the job
-      LOG.info("execute job: " + job);
+      String state = "FAIL";
 
-      String state = "SUCC";
+      Executor executor = new Executor(job);
+      try {
+        if (executor.exec()) {
+          state = "SUCC";
+        }
+      } catch (IOException e) {
+        LOG.error("Fail to exec job " + job.getId(), e);
+      }
+
       job.setState(state);
       job.setEndTime(CommonUtils.now());
       try {
         Config.JOB_DAO.updateJobById(job, job.getId());
       } catch (ConnectionPoolException | SQLException e) {
-        LOG.error("Failed to update job state: " + job.getId());
+        LOG.error("Fail to update job state: " + job.getId());
       }
     }
 

@@ -23,6 +23,7 @@ logging:
       timeZone: Asia/Shanghai
 
 pluto:
+  dataDir: /search/ted/pluto/data
   jobQueueSize: 20
   workerNum: 10
 

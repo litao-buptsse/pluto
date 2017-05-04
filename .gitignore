@@ -4,3 +4,5 @@ logs/
 /*.iml
 /data/
 *.log
+/pluto
+/pluto.tar.gz

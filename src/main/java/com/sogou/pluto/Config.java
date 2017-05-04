@@ -48,6 +48,7 @@ public class Config extends Configuration {
     return builder.build();
   }
 
+  public static String DATA_DIR;
   public static int JOB_QUEUE_SIZE;
   public static int WORKER_NUM;
   public static String HOST;
@@ -59,6 +60,7 @@ public class Config extends Configuration {
     Map<String, String> beaverConf = conf.getPlutoConf();
     Map<String, String> beaverDBConf = conf.getPlutoDbConf();
 
+    DATA_DIR = beaverConf.getOrDefault("dataDir", "data");
     JOB_QUEUE_SIZE = Integer.parseInt(beaverConf.getOrDefault("jobQueueSize", "20"));
     WORKER_NUM = Integer.parseInt(beaverConf.getOrDefault("workerNum", "10"));
     HOST = beaverConf.getOrDefault("host", CommonUtils.ip());
