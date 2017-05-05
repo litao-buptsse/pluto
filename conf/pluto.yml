@@ -14,7 +14,7 @@ server:
         port: 8081
 
 logging:
-  level: DEBUG
+  level: INFO
   appenders:
     - type: file
       currentLogFilename: ./logs/pluto.log

@@ -1,6 +1,5 @@
 package com.sogou.pluto.db;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -13,39 +12,31 @@ public class JDBCConnectionPool extends ConnectionPool<Connection> {
   private String url;
   private Properties info;
 
-  public JDBCConnectionPool(String driver, String url) throws ConnectionPoolException {
+  public JDBCConnectionPool(String driver, String url) throws SQLException {
     this(driver, url, null);
   }
 
-  public JDBCConnectionPool(String driver, String url, Properties info) throws ConnectionPoolException {
+  public JDBCConnectionPool(String driver, String url, Properties info) throws SQLException {
     try {
       Class.forName(driver);
     } catch (ClassNotFoundException e) {
-      throw new ConnectionPoolException(e);
+      throw new SQLException(e);
     }
     this.url = url;
     this.info = info;
   }
 
   @Override
-  protected Connection createConnection() throws IOException {
-    try {
-      if (info == null) {
-        return DriverManager.getConnection(url);
-      } else {
-        return DriverManager.getConnection(url, info);
-      }
-    } catch (SQLException e) {
-      throw new IOException(e);
+  protected Connection createConnection() throws SQLException {
+    if (info == null) {
+      return DriverManager.getConnection(url);
+    } else {
+      return DriverManager.getConnection(url, info);
     }
   }
 
   @Override
-  protected void closeConnection(Connection conn) throws IOException {
-    try {
-      conn.close();
-    } catch (SQLException e) {
-      throw new IOException(e);
-    }
+  protected void closeConnection(Connection conn) throws SQLException {
+    conn.close();
   }
 }

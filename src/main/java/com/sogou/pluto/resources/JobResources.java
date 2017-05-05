@@ -1,7 +1,6 @@
 package com.sogou.pluto.resources;
 
 import com.sogou.pluto.Config;
-import com.sogou.pluto.db.ConnectionPoolException;
 import com.sogou.pluto.model.Job;
 
 import java.sql.SQLException;
@@ -18,8 +17,7 @@ import javax.ws.rs.core.MediaType;
 public class JobResources {
   @POST
   @Consumes(MediaType.APPLICATION_JSON)
-  public void submitJob(Job job)
-      throws ConnectionPoolException, SQLException {
+  public void submitJob(Job job) throws SQLException {
     Config.JOB_DAO.createJob(job);
   }
 }

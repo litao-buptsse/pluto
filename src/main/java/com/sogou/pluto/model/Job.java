@@ -6,6 +6,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Created by Tao Li on 2016/6/1.
  */
 public class Job {
+  public static final String STATE_WAIT = "WAIT";
+  public static final String STATE_LOCK = "LOCK";
+  public static final String STATE_RUN = "RUN";
+  public static final String STATE_FAIL = "FAIL";
+  public static final String STATE_SUCC = "SUCC";
+
   private long id;
   private String name;
   private String userId;
@@ -16,15 +22,15 @@ public class Job {
   private String startTime;
   private String endTime;
   private String host;
+  private String gpuId;
 
   public Job() {
     // Jackson deserialization
   }
 
-
   public Job(long id, String name, String userId,
              String baseImage, String tarLocation, String startScript,
-             String state, String startTime, String endTime, String host) {
+             String state, String startTime, String endTime, String host, String gpuId) {
     this.id = id;
     this.name = name;
     this.userId = userId;
@@ -35,6 +41,7 @@ public class Job {
     this.startTime = startTime;
     this.endTime = endTime;
     this.host = host;
+    this.gpuId = gpuId;
   }
 
   @JsonProperty
@@ -127,6 +134,15 @@ public class Job {
     this.host = host;
   }
 
+  @JsonProperty
+  public String getGpuId() {
+    return gpuId;
+  }
+
+  public void setGpuId(String gpuId) {
+    this.gpuId = gpuId;
+  }
+
   @Override
   public String toString() {
     return "Job{" +
@@ -140,6 +156,7 @@ public class Job {
         ", startTime='" + startTime + '\'' +
         ", endTime='" + endTime + '\'' +
         ", host='" + host + '\'' +
+        ", gpuId='" + gpuId + '\'' +
         '}';
   }
 }

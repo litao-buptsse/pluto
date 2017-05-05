@@ -4,7 +4,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
+import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.TreeSet;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -159,9 +159,9 @@ public abstract class ConnectionPool<T> {
     this.idleConnectionCloseThreadPoolSize = idleConnectionCloseThreadPoolSize;
   }
 
-  public synchronized void start() throws ConnectionPoolException {
+  public synchronized void start() throws SQLException {
     if (isRunning) {
-      throw new ConnectionPoolException("pool is already running");
+      throw new SQLException("pool is already running");
     }
 
     isRunning = true;
@@ -187,24 +187,20 @@ public abstract class ConnectionPool<T> {
     }
   }
 
-  private PooledConnection createPooledConnection() throws ConnectionPoolException {
-    try {
-      LOG.debug("create new connection: " + getPoolInfo());
-      return new PooledConnection(createConnection());
-    } catch (IOException e) {
-      throw new ConnectionPoolException("fail to create connection", e);
-    }
+  private PooledConnection createPooledConnection() throws SQLException {
+    LOG.debug("create new connection: " + getPoolInfo());
+    return new PooledConnection(createConnection());
   }
 
-  public T getConnection() throws ConnectionPoolException {
+  public T getConnection() throws SQLException {
     if (!isRunning) {
-      throw new ConnectionPoolException("pool is closed");
+      throw new SQLException("pool is closed");
     }
     synchronized (lock) {
       LOG.debug("get connection: " + getPoolInfo());
       if (availableConnections.isEmpty()) {
         if (activeConnections.size() >= maxConnectionNum) {
-          throw new ConnectionPoolException("pool is full");
+          throw new SQLException("pool is full");
         } else {
           availableConnections.add(createPooledConnection());
         }
@@ -216,7 +212,7 @@ public abstract class ConnectionPool<T> {
     }
   }
 
-  public void releaseConnection(T conn) throws ConnectionPoolException {
+  public void releaseConnection(T conn) throws SQLException {
     if (conn == null) {
       return;
     }
@@ -241,7 +237,7 @@ public abstract class ConnectionPool<T> {
         PooledConnection pooledConnection = iter.next();
         try {
           closeConnection(pooledConnection.getConn());
-        } catch (IOException e) {
+        } catch (SQLException e) {
           // ignore
         }
         iter.remove();
@@ -271,7 +267,7 @@ public abstract class ConnectionPool<T> {
         ", idle: " + idleConnections.size() + ")";
   }
 
-  protected abstract void closeConnection(T conn) throws IOException;
+  protected abstract void closeConnection(T conn) throws SQLException;
 
-  protected abstract T createConnection() throws IOException;
+  protected abstract T createConnection() throws SQLException;
 }

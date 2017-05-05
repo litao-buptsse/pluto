@@ -67,8 +67,7 @@ public class JDBCUtils {
     return futures;
   }
 
-  public static boolean execute(JDBCConnectionPool pool, String sql)
-      throws ConnectionPoolException, SQLException {
+  public static boolean execute(JDBCConnectionPool pool, String sql) throws SQLException {
     LOG.debug("sql: " + sql);
     Connection conn = pool.getConnection();
     try {
@@ -80,8 +79,7 @@ public class JDBCUtils {
     }
   }
 
-  public static boolean execute(String sql)
-      throws ConnectionPoolException, SQLException {
+  public static boolean execute(String sql) throws SQLException {
     return execute(Config.POOL, sql);
   }
 }

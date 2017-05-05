@@ -1,14 +1,15 @@
 package com.sogou.pluto;
 
 import com.sogou.pluto.common.CommonUtils;
+import com.sogou.pluto.dao.GpuDao;
 import com.sogou.pluto.dao.JobDao;
-import com.sogou.pluto.db.ConnectionPoolException;
 import com.sogou.pluto.db.JDBCConnectionPool;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableMap;
 import io.dropwizard.Configuration;
 
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
@@ -55,8 +56,9 @@ public class Config extends Configuration {
 
   public static JDBCConnectionPool POOL;
   public static JobDao JOB_DAO;
+  public static GpuDao GPU_DAO;
 
-  public static void initStaticConfig(Config conf) throws ConnectionPoolException {
+  public static void initStaticConfig(Config conf) throws SQLException {
     Map<String, String> beaverConf = conf.getPlutoConf();
     Map<String, String> beaverDBConf = conf.getPlutoDbConf();
 
@@ -70,15 +72,16 @@ public class Config extends Configuration {
 
     // init dao object
     JOB_DAO = new JobDao();
+    GPU_DAO = new GpuDao();
   }
 
   private static JDBCConnectionPool constructJDBCConnectionPool(Map<String, String> conf)
-      throws ConnectionPoolException {
+      throws SQLException {
     return constructJDBCConnectionPool(conf, new Properties());
   }
 
   private static JDBCConnectionPool constructJDBCConnectionPool(
-      Map<String, String> conf, Properties info) throws ConnectionPoolException {
+      Map<String, String> conf, Properties info) throws SQLException {
     String driver = conf.get("driverClass");
     String url = conf.get("url");
     JDBCConnectionPool pool = new JDBCConnectionPool(driver, url, info);

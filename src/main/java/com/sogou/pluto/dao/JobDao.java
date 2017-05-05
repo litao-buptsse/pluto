@@ -2,7 +2,6 @@ package com.sogou.pluto.dao;
 
 import com.sogou.pluto.Config;
 import com.sogou.pluto.common.CommonUtils;
-import com.sogou.pluto.db.ConnectionPoolException;
 import com.sogou.pluto.db.JDBCUtils;
 import com.sogou.pluto.model.Job;
 
@@ -21,20 +20,21 @@ import java.util.stream.LongStream;
 public class JobDao {
   private final static String TABLE_NAME = "jobs";
 
-  public void createJob(Job job) throws ConnectionPoolException, SQLException {
+  public void createJob(Job job) throws SQLException {
     JDBCUtils.execute(String.format(
         "INSERT INTO %s (name, userId, baseImage, tarLocation, startScript, state, startTime)" +
-            "VALUES(%s, %s, %s, %s, %s, 'WAIT', %s)",
+            "VALUES(%s, %s, %s, %s, %s, %s, %s)",
         TABLE_NAME,
         CommonUtils.formatSQLValue(job.getName()),
         CommonUtils.formatSQLValue(job.getUserId()),
         CommonUtils.formatSQLValue(job.getBaseImage()),
         CommonUtils.formatSQLValue(job.getTarLocation()),
         CommonUtils.formatSQLValue(job.getStartScript()),
+        CommonUtils.formatSQLValue(Job.STATE_WAIT),
         CommonUtils.formatSQLValue(CommonUtils.now())));
   }
 
-  private void updateJob(Job job, String whereClause) throws ConnectionPoolException, SQLException {
+  private void updateJob(Job job, String whereClause) throws SQLException {
     JDBCUtils.execute(String.format(
         "UPDATE %s SET name=%s, userId=%s, baseImage=%s, tarLocation=%s, startScript=%s, " +
             "state=%s, startTime=%s, endTime=%s, host=%s %s",
@@ -51,17 +51,17 @@ public class JobDao {
         whereClause));
   }
 
-  public void updateJobById(Job job, long id) throws ConnectionPoolException, SQLException {
+  public void updateJobById(Job job, long id) throws SQLException {
     updateJob(job, String.format("WHERE id=%s", id));
   }
 
   public void updateJobByIdAndStateAndHost(Job job, long id, String state, String host)
-      throws ConnectionPoolException, SQLException {
+      throws SQLException {
     updateJob(job, String.format("WHERE id=%s AND state='%s' AND host='%s'", id, state, host));
   }
 
   public void updateJobsStateAndHostByIds(String state, String host, long[] ids)
-      throws ConnectionPoolException, SQLException {
+      throws SQLException {
     JDBCUtils.execute(String.format(
         "UPDATE %s SET state=%s, host=%s WHERE id in (%s)",
         TABLE_NAME,
@@ -70,7 +70,7 @@ public class JobDao {
         LongStream.of(ids).mapToObj(id -> String.valueOf(id)).collect(Collectors.joining(", "))));
   }
 
-  private List<Job> getJobs(String whereClause) throws ConnectionPoolException, SQLException {
+  private List<Job> getJobs(String whereClause) throws SQLException {
     String sql = String.format("SELECT * FROM %s %s", TABLE_NAME, whereClause);
     Connection conn = Config.POOL.getConnection();
     try {
@@ -88,8 +88,8 @@ public class JobDao {
                 rs.getString("state"),
                 rs.getString("startTime"),
                 rs.getString("endTime"),
-                rs.getString("host")
-            ));
+                rs.getString("host"),
+                rs.getString("gpuId")));
           }
           return jobs;
         }
@@ -99,34 +99,29 @@ public class JobDao {
     }
   }
 
-  private Job getJob(String whereClause) throws ConnectionPoolException, SQLException {
+  private Job getJob(String whereClause) throws SQLException {
     List<Job> jobs = getJobs(whereClause);
     return jobs.size() == 0 ? null : jobs.get(0);
   }
 
-  public List<Job> getJobsByState(String state, int limit)
-      throws ConnectionPoolException, SQLException {
+  public List<Job> getJobsByState(String state, int limit) throws SQLException {
     return getJobs(String.format("WHERE state='%s' ORDER BY id ASC LIMIT %s", state, limit));
   }
 
-  public List<Job> getJobsByStateAndHost(String state, String host)
-      throws ConnectionPoolException, SQLException {
+  public List<Job> getJobsByStateAndHost(String state, String host) throws SQLException {
     return getJobs(String.format("WHERE state='%s' And host='%s' ORDER BY id ASC", state, host));
   }
 
-  public Job getJobById(long id)
-      throws ConnectionPoolException, SQLException {
+  public Job getJobById(long id) throws SQLException {
     return getJob(String.format("WHERE id=%s ORDER BY id ASC", id));
   }
 
-  public List<Job> getJobsByUserId(String userId, int start, int length)
-      throws ConnectionPoolException, SQLException {
+  public List<Job> getJobsByUserId(String userId, int start, int length) throws SQLException {
     return getJobs(String.format(
         "WHERE userId='%s' ORDER BY id DESC LIMIT %s, %s", userId, start, length));
   }
 
-  public List<Job> getJobs(int start, int length)
-      throws ConnectionPoolException, SQLException {
+  public List<Job> getJobs(int start, int length) throws SQLException {
     return getJobs(String.format("ORDER BY id DESC LIMIT %s, %s", start, length));
   }
 }

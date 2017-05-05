@@ -2,7 +2,7 @@ package com.sogou.pluto.core.execution;
 
 import com.sogou.pluto.Config;
 import com.sogou.pluto.common.CommonUtils;
-import com.sogou.pluto.db.ConnectionPoolException;
+import com.sogou.pluto.model.Gpu;
 import com.sogou.pluto.model.Job;
 
 import org.slf4j.Logger;
@@ -45,22 +45,24 @@ public class JobExecuteController implements Runnable {
 
   private class Worker implements Runnable {
     private void runJob(Job job) {
-      String state = "FAIL";
+      String state = Job.STATE_FAIL;
 
       Executor executor = new Executor(job);
       try {
         if (executor.exec()) {
-          state = "SUCC";
+          state = Job.STATE_SUCC;
         }
       } catch (IOException e) {
         LOG.error("Fail to exec job " + job.getId(), e);
+      } finally {
+        releaseGpu(job.getGpuId());
       }
 
       job.setState(state);
       job.setEndTime(CommonUtils.now());
       try {
         Config.JOB_DAO.updateJobById(job, job.getId());
-      } catch (ConnectionPoolException | SQLException e) {
+      } catch (SQLException e) {
         LOG.error("Fail to update job state: " + job.getId());
       }
     }
@@ -83,28 +85,42 @@ public class JobExecuteController implements Runnable {
   public void run() {
     isRunning = true;
 
-    IntStream.iterate(0, n -> n + 1).limit(workerNum).forEach(i -> {
-      workerPool.submit(new Worker());
-    });
+    try {
+      onlineGpus();
+    } catch (SQLException e) {
+      LOG.error("Fail to online gpus", e);
+      return;
+    }
+
+    IntStream.iterate(0, n -> n + 1).limit(workerNum)
+        .forEach(i -> workerPool.submit(new Worker()));
 
     try {
       cleanZombieJobs();
-    } catch (ConnectionPoolException | SQLException e) {
-      LOG.error("Failed to clean zombie jobs", e);
+    } catch (SQLException e) {
+      LOG.error("Fail to clean zombie jobs", e);
     }
 
     while (isRunning && !Thread.currentThread().isInterrupted()) {
       List<Job> jobs = null;
       try {
-        jobs = Config.JOB_DAO.getJobsByState("WAIT", CHECK_JOB_BATCH);
-      } catch (ConnectionPoolException | SQLException e) {
-        LOG.error("Failed to get WAIT jobs", e);
+        jobs = Config.JOB_DAO.getJobsByState(Job.STATE_WAIT, CHECK_JOB_BATCH);
+      } catch (SQLException e) {
+        LOG.error("Fail to get WAIT jobs", e);
       }
 
       if (jobs != null) {
         jobs.stream().forEach(job -> {
-          if (jobQueue.size() < jobQueueSize && preemptJob(job)) {
-            jobQueue.add(job);
+          if (jobQueue.size() < jobQueueSize) {
+            Gpu gpu = acquireOneAvailableGpu();
+            if (gpu != null) {
+              if (preemptJob(job, gpu)) {
+                LOG.info(String.format("preempt jobId: %s, gpuId: %s", job.getId(), gpu.getId()));
+                jobQueue.add(job);
+              } else {
+                releaseGpu(gpu.getGpuId());
+              }
+            }
           }
         });
       }
@@ -118,25 +134,26 @@ public class JobExecuteController implements Runnable {
     }
   }
 
-  private void cleanZombieJobs() throws ConnectionPoolException, SQLException {
-    List<Job> lockJobs = Config.JOB_DAO.getJobsByStateAndHost("LOCK", host);
+  private void cleanZombieJobs() throws SQLException {
+    List<Job> lockJobs = Config.JOB_DAO.getJobsByStateAndHost(Job.STATE_LOCK, host);
     if (lockJobs.size() > 0) {
       Config.JOB_DAO.updateJobsStateAndHostByIds(
-          "WAIT", null, lockJobs.stream().mapToLong(job -> job.getId()).toArray());
+          Job.STATE_WAIT, null, lockJobs.stream().mapToLong(job -> job.getId()).toArray());
     }
-    List<Job> runJobs = Config.JOB_DAO.getJobsByStateAndHost("RUN", host);
+    List<Job> runJobs = Config.JOB_DAO.getJobsByStateAndHost(Job.STATE_RUN, host);
     if (runJobs.size() > 0) {
       Config.JOB_DAO.updateJobsStateAndHostByIds(
-          "FAIL", host, runJobs.stream().mapToLong(job -> job.getId()).toArray());
+          Job.STATE_FAIL, host, runJobs.stream().mapToLong(job -> job.getId()).toArray());
     }
   }
 
-  private boolean preemptJob(Job job) {
+  private boolean preemptJob(Job job, Gpu gpu) {
     try {
       boolean needToRollback = false;
 
-      job.setState("LOCK");
+      job.setState(Job.STATE_LOCK);
       job.setHost(host);
+      job.setGpuId(gpu.getGpuId());
       Config.JOB_DAO.updateJobById(job, job.getId());
 
       try {
@@ -149,28 +166,80 @@ public class JobExecuteController implements Runnable {
 
       try {
         job = Config.JOB_DAO.getJobById(job.getId());
-        if (job.getState().equals("LOCK") && job.getHost().equals(host)) {
-          job.setState("RUN");
+        if (job.getState().equals(Job.STATE_LOCK) && job.getHost().equals(host)) {
+          job.setState(Job.STATE_RUN);
           Config.JOB_DAO.updateJobById(job, job.getId());
           return true;
         }
-      } catch (ConnectionPoolException | SQLException e) {
+      } catch (SQLException e) {
         LOG.error("Failed to preempt job: " + job.getId(), e);
         needToRollback = true;
       }
 
       if (needToRollback) {
-        job.setState("WAIT");
+        job.setState(Job.STATE_WAIT);
         job.setHost(null);
-        Config.JOB_DAO.updateJobByIdAndStateAndHost(job, job.getId(), "LOCK", host);
+        job.setGpuId(null);
+        Config.JOB_DAO.updateJobByIdAndStateAndHost(job, job.getId(), Job.STATE_LOCK, host);
       }
-    } catch (ConnectionPoolException | SQLException e) {
+    } catch (SQLException e) {
       LOG.error("Failed to preempt job: " + job.getId(), e);
     }
+
     return false;
+  }
+
+  private void onlineGpus() throws SQLException {
+    Config.GPU_DAO.updateGpusState(Gpu.STATE_AVAILABLE, Config.HOST);
+  }
+
+  private void offlineGpus() throws SQLException {
+    Config.GPU_DAO.updateGpusState(Gpu.STATE_OFFLINE, Config.HOST);
+  }
+
+  private Gpu acquireOneAvailableGpu() {
+    Gpu gpu = null;
+
+    try {
+      List<Gpu> gpus = Config.GPU_DAO.getGpusByStateAndNode(Gpu.STATE_AVAILABLE, Config.HOST);
+      if (gpus.size() > 0) {
+        gpu = gpus.get(0);
+      }
+    } catch (SQLException e) {
+      LOG.error("fail to get gpus", e);
+    }
+
+    if (gpu != null) {
+      try {
+        Config.GPU_DAO.updateGpuState(Gpu.STATE_IN_USE, Config.HOST, gpu.getGpuId());
+      } catch (SQLException e) {
+        LOG.error("fail to update gpu state");
+        try {
+          Config.GPU_DAO.updateGpuState(Gpu.STATE_AVAILABLE, Config.HOST, gpu.getGpuId());
+        } catch (SQLException ex) {
+          // ignore
+        }
+      }
+    }
+
+    return gpu;
+  }
+
+  private void releaseGpu(String gpuId) {
+    try {
+      Config.GPU_DAO.updateGpuState(Gpu.STATE_AVAILABLE, Config.HOST, gpuId);
+    } catch (SQLException e) {
+      LOG.error("fail to release gpu " + gpuId);
+    }
   }
 
   public void shutdown() {
     isRunning = false;
+
+    try {
+      offlineGpus();
+    } catch (SQLException e) {
+      LOG.error("Fail to shutdown JobExecuteController", e);
+    }
   }
 }
