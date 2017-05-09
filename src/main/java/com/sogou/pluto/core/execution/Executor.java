@@ -37,7 +37,7 @@ public class Executor {
     String command = String.format(
         "/usr/sbin/sshd -D & " +
             "NV_GPU=%s nvidia-docker run --net=host --rm -v %s:/search -w /search %s %s >%s 2>%s",
-        job.getGpuId(), jobContainerDir, job.getBaseImage(), job.getStartScript(),
+        job.getGpuIds(), jobContainerDir, job.getBaseImage(), job.getStartCommand(),
         jobStdOutLogFile, jobStdErrLogFile);
     LOG.info(String.format("Begin to execute jobId: %s, command: %s", job.getId(), command));
     int exitCode = CommonUtils.runProcess(command);

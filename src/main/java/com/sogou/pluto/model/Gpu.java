@@ -12,14 +12,14 @@ public class Gpu {
 
   private long id;
   private String node;
-  private String gpuId;
+  private int gpuId;
   private String state;
 
   public Gpu() {
     // Jackson deserialization
   }
 
-  public Gpu(long id, String node, String gpuId, String state) {
+  public Gpu(long id, String node, int gpuId, String state) {
     this.id = id;
     this.node = node;
     this.gpuId = gpuId;
@@ -45,11 +45,11 @@ public class Gpu {
   }
 
   @JsonProperty
-  public String getGpuId() {
+  public int getGpuId() {
     return gpuId;
   }
 
-  public void setGpuId(String gpuId) {
+  public void setGpuId(int gpuId) {
     this.gpuId = gpuId;
   }
 

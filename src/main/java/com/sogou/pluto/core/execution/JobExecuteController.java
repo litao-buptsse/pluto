@@ -10,13 +10,16 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * Created by Tao Li on 2016/6/2.
@@ -55,7 +58,8 @@ public class JobExecuteController implements Runnable {
       } catch (IOException e) {
         LOG.error("Fail to exec job " + job.getId(), e);
       } finally {
-        releaseGpu(job.getGpuId());
+        releaseGpu(Stream.of(job.getGpuIds().split(","))
+            .mapToInt(gpuId -> Integer.parseInt(gpuId)).toArray());
       }
 
       job.setState(state);
@@ -112,13 +116,13 @@ public class JobExecuteController implements Runnable {
       if (jobs != null) {
         jobs.stream().forEach(job -> {
           if (jobQueue.size() < jobQueueSize) {
-            Gpu gpu = acquireOneAvailableGpu();
-            if (gpu != null) {
-              if (preemptJob(job, gpu)) {
-                LOG.info(String.format("preempt jobId: %s, gpuId: %s", job.getId(), gpu.getId()));
+            List<Gpu> gpus = acquireAvailableGpus(job.getGpuNum());
+            if (gpus.size() == job.getGpuNum()) {
+              if (preemptJob(job, gpus)) {
+                LOG.info(String.format("preempt jobId: %s, gpuIds: %s", job.getId(), gpus));
                 jobQueue.add(job);
               } else {
-                releaseGpu(gpu.getGpuId());
+                releaseGpu(gpus.stream().mapToInt(gpu -> gpu.getGpuId()).toArray());
               }
             }
           }
@@ -147,13 +151,14 @@ public class JobExecuteController implements Runnable {
     }
   }
 
-  private boolean preemptJob(Job job, Gpu gpu) {
+  private boolean preemptJob(Job job, List<Gpu> gpus) {
     try {
       boolean needToRollback = false;
 
       job.setState(Job.STATE_LOCK);
       job.setHost(host);
-      job.setGpuId(gpu.getGpuId());
+      job.setGpuIds(gpus.stream().map(gpu -> String.valueOf(gpu.getGpuId()))
+          .collect(Collectors.joining(",")));
       Config.JOB_DAO.updateJobById(job, job.getId());
 
       try {
@@ -179,7 +184,7 @@ public class JobExecuteController implements Runnable {
       if (needToRollback) {
         job.setState(Job.STATE_WAIT);
         job.setHost(null);
-        job.setGpuId(null);
+        job.setGpuIds(null);
         Config.JOB_DAO.updateJobByIdAndStateAndHost(job, job.getId(), Job.STATE_LOCK, host);
       }
     } catch (SQLException e) {
@@ -190,46 +195,49 @@ public class JobExecuteController implements Runnable {
   }
 
   private void onlineGpus() throws SQLException {
-    Config.GPU_DAO.updateGpusState(Gpu.STATE_AVAILABLE, Config.HOST);
+    Config.GPU_DAO.updateStateByNode(Gpu.STATE_AVAILABLE, Config.HOST);
   }
 
   private void offlineGpus() throws SQLException {
-    Config.GPU_DAO.updateGpusState(Gpu.STATE_OFFLINE, Config.HOST);
+    Config.GPU_DAO.updateStateByNode(Gpu.STATE_OFFLINE, Config.HOST);
   }
 
-  private Gpu acquireOneAvailableGpu() {
-    Gpu gpu = null;
+  private List<Gpu> acquireAvailableGpus(int num) {
+    List<Gpu> gpus = new ArrayList<>();
 
     try {
-      List<Gpu> gpus = Config.GPU_DAO.getGpusByStateAndNode(Gpu.STATE_AVAILABLE, Config.HOST);
-      if (gpus.size() > 0) {
-        gpu = gpus.get(0);
+      List<Gpu> allAvailableGpus =
+          Config.GPU_DAO.getGpusByStateAndNode(Gpu.STATE_AVAILABLE, Config.HOST);
+      if (allAvailableGpus.size() >= num) {
+        gpus.addAll(allAvailableGpus.subList(0, num));
       }
     } catch (SQLException e) {
       LOG.error("fail to get gpus", e);
     }
 
-    if (gpu != null) {
+    if (gpus.size() == num) {
       try {
-        Config.GPU_DAO.updateGpuState(Gpu.STATE_IN_USE, Config.HOST, gpu.getGpuId());
+        Config.GPU_DAO.updateStateByNodeAndGpuIds(Gpu.STATE_IN_USE, Config.HOST,
+            gpus.stream().mapToInt(gpu -> gpu.getGpuId()).toArray());
       } catch (SQLException e) {
         LOG.error("fail to update gpu state");
         try {
-          Config.GPU_DAO.updateGpuState(Gpu.STATE_AVAILABLE, Config.HOST, gpu.getGpuId());
+          Config.GPU_DAO.updateStateByNodeAndGpuIds(Gpu.STATE_AVAILABLE, Config.HOST,
+              gpus.stream().mapToInt(gpu -> gpu.getGpuId()).toArray());
         } catch (SQLException ex) {
           // ignore
         }
       }
     }
 
-    return gpu;
+    return gpus;
   }
 
-  private void releaseGpu(String gpuId) {
+  private void releaseGpu(int[] gpuIds) {
     try {
-      Config.GPU_DAO.updateGpuState(Gpu.STATE_AVAILABLE, Config.HOST, gpuId);
+      Config.GPU_DAO.updateStateByNodeAndGpuIds(Gpu.STATE_AVAILABLE, Config.HOST, gpuIds);
     } catch (SQLException e) {
-      LOG.error("fail to release gpu " + gpuId);
+      LOG.error("fail to release gpus", e);
     }
   }
 

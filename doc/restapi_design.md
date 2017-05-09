@@ -19,7 +19,7 @@
   submitType, // TAR, DOCKER
   baseImage, // for type TAR
   tarLocation, // for type TAR
-  startScript, // for type TAR, optional, default start.sh
+  startCommand, // for type TAR, optional, default start.sh
   dockerImage, // for type DOCKER
   dockerCommand, // for type DOCKER
   resourceDemand

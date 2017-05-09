@@ -22,32 +22,35 @@ public class JobDao {
 
   public void createJob(Job job) throws SQLException {
     JDBCUtils.execute(String.format(
-        "INSERT INTO %s (name, userId, baseImage, tarLocation, startScript, state, startTime)" +
-            "VALUES(%s, %s, %s, %s, %s, %s, %s)",
+        "INSERT INTO %s (name, userId, baseImage, tarLocation, startCommand, gpuNum, " +
+            "state, startTime)" +
+            "VALUES(%s, %s, %s, %s, %s, %s, %s, %s)",
         TABLE_NAME,
         CommonUtils.formatSQLValue(job.getName()),
         CommonUtils.formatSQLValue(job.getUserId()),
         CommonUtils.formatSQLValue(job.getBaseImage()),
         CommonUtils.formatSQLValue(job.getTarLocation()),
-        CommonUtils.formatSQLValue(job.getStartScript()),
+        CommonUtils.formatSQLValue(job.getStartCommand()),
+        CommonUtils.formatSQLValue(String.valueOf(job.getGpuNum())),
         CommonUtils.formatSQLValue(Job.STATE_WAIT),
         CommonUtils.formatSQLValue(CommonUtils.now())));
   }
 
   private void updateJob(Job job, String whereClause) throws SQLException {
     JDBCUtils.execute(String.format(
-        "UPDATE %s SET name=%s, userId=%s, baseImage=%s, tarLocation=%s, startScript=%s, " +
-            "state=%s, startTime=%s, endTime=%s, host=%s %s",
+        "UPDATE %s SET name=%s, userId=%s, baseImage=%s, tarLocation=%s, startCommand=%s, " +
+            "state=%s, startTime=%s, endTime=%s, host=%s, gpuIds=%s %s",
         TABLE_NAME,
         CommonUtils.formatSQLValue(job.getName()),
         CommonUtils.formatSQLValue(job.getUserId()),
         CommonUtils.formatSQLValue(job.getBaseImage()),
         CommonUtils.formatSQLValue(job.getTarLocation()),
-        CommonUtils.formatSQLValue(job.getStartScript()),
+        CommonUtils.formatSQLValue(job.getStartCommand()),
         CommonUtils.formatSQLValue(job.getState()),
         CommonUtils.formatSQLValue(job.getStartTime()),
         CommonUtils.formatSQLValue(job.getEndTime()),
         CommonUtils.formatSQLValue(job.getHost()),
+        CommonUtils.formatSQLValue(job.getGpuIds()),
         whereClause));
   }
 
@@ -84,12 +87,13 @@ public class JobDao {
                 rs.getString("userId"),
                 rs.getString("baseImage"),
                 rs.getString("tarLocation"),
-                rs.getString("startScript"),
+                rs.getString("startCommand"),
+                rs.getInt("gpuNum"),
                 rs.getString("state"),
                 rs.getString("startTime"),
                 rs.getString("endTime"),
                 rs.getString("host"),
-                rs.getString("gpuId")));
+                rs.getString("gpuIds")));
           }
           return jobs;
         }

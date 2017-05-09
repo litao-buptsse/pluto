@@ -11,6 +11,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Created by Tao Li on 05/05/2017.
@@ -18,19 +20,19 @@ import java.util.List;
 public class GpuDao {
   private final static String TABLE_NAME = "gpus";
 
-  public void updateGpuState(String state, String node, String groupId) throws SQLException {
-    JDBCUtils.execute(String.format(
-        "UPDATE %s SET state=%s WHERE node=%s AND gpuId=%s",
-        TABLE_NAME,
-        CommonUtils.formatSQLValue(state),
-        CommonUtils.formatSQLValue(node),
-        CommonUtils.formatSQLValue(groupId)));
-  }
-
-  public void updateGpusState(String state, String node) throws SQLException {
+  public void updateStateByNode(String state, String node) throws SQLException {
     JDBCUtils.execute(String.format(
         "UPDATE %s SET state=%s WHERE node=%s",
         TABLE_NAME, CommonUtils.formatSQLValue(state), CommonUtils.formatSQLValue(node)));
+  }
+
+  public void updateStateByNodeAndGpuIds(String state, String node, int[] gpuIds) throws
+      SQLException {
+    JDBCUtils.execute(String.format(
+        "UPDATE %s SET state=%s WHERE node=%s AND gpuId in (%s)",
+        TABLE_NAME, CommonUtils.formatSQLValue(state), CommonUtils.formatSQLValue(node),
+        IntStream.of(gpuIds).mapToObj(gpuId -> CommonUtils.formatCSVValue(String.valueOf(gpuId)))
+            .collect(Collectors.joining(", "))));
   }
 
   private List<Gpu> getGpus(String whereClause) throws SQLException {
@@ -44,7 +46,7 @@ public class GpuDao {
             gpus.add(new Gpu(
                 rs.getLong("id"),
                 rs.getString("node"),
-                rs.getString("gpuId"),
+                rs.getInt("gpuId"),
                 rs.getString("state")));
           }
           return gpus;

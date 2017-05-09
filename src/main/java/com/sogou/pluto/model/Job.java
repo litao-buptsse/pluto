@@ -17,31 +17,33 @@ public class Job {
   private String userId;
   private String baseImage;
   private String tarLocation;
-  private String startScript;
+  private String startCommand;
+  private int gpuNum;
   private String state;
   private String startTime;
   private String endTime;
   private String host;
-  private String gpuId;
+  private String gpuIds;
 
   public Job() {
     // Jackson deserialization
   }
 
   public Job(long id, String name, String userId,
-             String baseImage, String tarLocation, String startScript,
-             String state, String startTime, String endTime, String host, String gpuId) {
+             String baseImage, String tarLocation, String startCommand, int gpuNum,
+             String state, String startTime, String endTime, String host, String gpuIds) {
     this.id = id;
     this.name = name;
     this.userId = userId;
     this.baseImage = baseImage;
     this.tarLocation = tarLocation;
-    this.startScript = startScript;
+    this.startCommand = startCommand;
+    this.gpuNum = gpuNum;
     this.state = state;
     this.startTime = startTime;
     this.endTime = endTime;
     this.host = host;
-    this.gpuId = gpuId;
+    this.gpuIds = gpuIds;
   }
 
   @JsonProperty
@@ -90,12 +92,21 @@ public class Job {
   }
 
   @JsonProperty
-  public String getStartScript() {
-    return startScript;
+  public String getStartCommand() {
+    return startCommand;
   }
 
-  public void setStartScript(String startScript) {
-    this.startScript = startScript;
+  public void setStartCommand(String startCommand) {
+    this.startCommand = startCommand;
+  }
+
+  @JsonProperty
+  public int getGpuNum() {
+    return gpuNum;
+  }
+
+  public void setGpuNum(int gpuNum) {
+    this.gpuNum = gpuNum;
   }
 
   @JsonProperty
@@ -135,12 +146,12 @@ public class Job {
   }
 
   @JsonProperty
-  public String getGpuId() {
-    return gpuId;
+  public String getGpuIds() {
+    return gpuIds;
   }
 
-  public void setGpuId(String gpuId) {
-    this.gpuId = gpuId;
+  public void setGpuIds(String gpuIds) {
+    this.gpuIds = gpuIds;
   }
 
   @Override
@@ -151,12 +162,12 @@ public class Job {
         ", userId='" + userId + '\'' +
         ", baseImage='" + baseImage + '\'' +
         ", tarLocation='" + tarLocation + '\'' +
-        ", startScript='" + startScript + '\'' +
+        ", startCommand='" + startCommand + '\'' +
         ", state='" + state + '\'' +
         ", startTime='" + startTime + '\'' +
         ", endTime='" + endTime + '\'' +
         ", host='" + host + '\'' +
-        ", gpuId='" + gpuId + '\'' +
+        ", gpuIds='" + gpuIds + '\'' +
         '}';
   }
 }
